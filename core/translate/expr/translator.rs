@@ -2191,7 +2191,7 @@ pub fn translate_expr(
         } if table_ref_id.is_self_table() => {
             // the table is a SELF_TABLE placeholder (used for generated columns), so we now have
             // to resolve it to the actual reference id using the SelfTableContext.
-            return program.with_existing_self_table_context(|program, self_table_context| {
+            return resolver.with_existing_self_table_context(|self_table_context| {
                 match self_table_context {
                     Some(SelfTableContext::ForSelect {
                         table_ref_id: real_id,
@@ -2221,7 +2221,7 @@ pub fn translate_expr(
                         Ok(target_register)
                     }
                     None => {
-                        // This error means that a program.with_self_table_context() was missing
+                        // This error means that a resolver.with_self_table_context() scope was missing
                         // somewhere in the call stack.
                         crate::bail_parse_error!(
                             "SELF_TABLE column reference outside of generated column context"
@@ -2403,11 +2403,13 @@ pub fn translate_expr(
                             // if we're reading from an index that contains this virtual column,
                             // the index already has the computed value, so read it from the index
                             GeneratedType::Virtual { expr, .. } if !read_from_index => {
-                                program.with_self_table_context(
-                                    Some(&SelfTableContext::ForSelect {
-                                        table_ref_id: *table_ref_id,
-                                        referenced_tables: referenced_tables.unwrap().clone(),
-                                    }),
+                                let self_ctx = SelfTableContext::ForSelect {
+                                    table_ref_id: *table_ref_id,
+                                    referenced_tables: referenced_tables.unwrap().clone(),
+                                };
+                                resolver.with_self_table_context(
+                                    program,
+                                    Some(&self_ctx),
                                     |program, _| {
                                         translate_expr(
                                             program,

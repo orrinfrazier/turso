@@ -29,6 +29,13 @@ pub(crate) fn get_expr_affinity_info(
 ) -> ExprAffinityInfo {
     match expr {
         ast::Expr::Column { table, column, .. } => {
+            if table.is_self_table() {
+                if let Some(resolver) = resolver {
+                    if let Some(aff) = resolver.self_table_affinity(*column) {
+                        return ExprAffinityInfo::with_affinity(aff);
+                    }
+                }
+            }
             if let Some(tables) = referenced_tables {
                 if let Some((_, table_ref)) = tables.find_table_by_internal_id(*table) {
                     if let Some(col) = table_ref.get_column_at(*column) {
@@ -38,16 +45,6 @@ pub(crate) fn get_expr_affinity_info(
                             );
                         }
                         return ExprAffinityInfo::with_affinity(col.affinity());
-                    }
-                }
-            }
-            // SELF_TABLE fallback: during DML expression index evaluation,
-            // referenced_tables is None but column affinities are available
-            // via the resolver's self_table_column_affinities.
-            if table.is_self_table() {
-                if let Some(resolver) = resolver {
-                    if let Some(aff) = resolver.self_table_column_affinities.get(*column) {
-                        return ExprAffinityInfo::with_affinity(*aff);
                     }
                 }
             }

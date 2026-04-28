@@ -707,7 +707,7 @@ pub(super) fn extract_string_literal(expr: &ast::Expr) -> crate::Result<String> 
 ///
 /// In the DML index-maintenance path (INSERT with expression indexes),
 /// `referenced_tables` is `None` and columns use `SELF_TABLE`. We fall back
-/// to the ProgramBuilder's `SelfTableContext::ForDML` to obtain column metadata.
+/// to the Resolver's `SelfTableContext::ForDML` to obtain column metadata.
 /// Resolve the TypeDef for a column expression (Column or DML self-table column).
 pub(super) fn resolve_typedef_from_column(
     expr: &ast::Expr,
@@ -797,8 +797,8 @@ pub(super) fn resolve_column_type_str(
     table: ast::TableInternalId,
     column: usize,
     referenced_tables: Option<&TableReferences>,
-    _resolver: &Resolver,
-    program: &ProgramBuilder,
+    resolver: &Resolver,
+    _program: &ProgramBuilder,
 ) -> Option<String> {
     if let Some(rt) = referenced_tables {
         if let Some((_, tbl)) = rt.find_table_by_internal_id(table) {
@@ -806,7 +806,7 @@ pub(super) fn resolve_column_type_str(
         }
     }
     if table.is_self_table() {
-        if let Some(SelfTableContext::ForDML { table, .. }) = program.current_self_table_context() {
+        if let Some(SelfTableContext::ForDML { table, .. }) = resolver.self_table_context() {
             return Some(table.columns().get(column)?.ty_str.clone());
         }
     }

@@ -362,7 +362,7 @@ pub(crate) fn emit_dml_expr_index_value(
         dml_ctx: DmlColumnContext::from_column_reg_mapping(pairs),
         table: Arc::clone(table),
     };
-    program.with_self_table_context(Some(&ctx), |program, _| {
+    resolver.with_self_table_context(program, Some(&ctx), |program, _| {
         translate_expr(program, None, &expr, dest_reg, resolver)?;
         Ok(())
     })?;
