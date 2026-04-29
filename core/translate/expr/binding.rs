@@ -713,11 +713,10 @@ pub(super) fn resolve_typedef_from_column(
     expr: &ast::Expr,
     referenced_tables: Option<&TableReferences>,
     resolver: &Resolver,
-    program: &ProgramBuilder,
 ) -> Option<Arc<TypeDef>> {
     let ty_str = match expr {
         ast::Expr::Column { table, column, .. } => {
-            resolve_column_type_str(*table, *column, referenced_tables, resolver, program)?
+            resolve_column_type_str(*table, *column, referenced_tables, resolver)?
         }
         ast::Expr::Variable(var) => var.col_type.as_ref()?.to_string(),
         _ => return None,
@@ -730,10 +729,8 @@ pub(super) fn resolve_union_from_column(
     expr: &ast::Expr,
     referenced_tables: Option<&TableReferences>,
     resolver: &Resolver,
-    program: &ProgramBuilder,
 ) -> Option<Arc<TypeDef>> {
-    resolve_typedef_from_column(expr, referenced_tables, resolver, program)
-        .filter(|td| td.is_union())
+    resolve_typedef_from_column(expr, referenced_tables, resolver).filter(|td| td.is_union())
 }
 
 /// Resolve the struct TypeDef that an expression evaluates to.
@@ -745,13 +742,10 @@ pub(super) fn resolve_struct_from_expr(
     expr: &ast::Expr,
     referenced_tables: Option<&TableReferences>,
     resolver: &Resolver,
-    program: &ProgramBuilder,
 ) -> Option<Arc<TypeDef>> {
     match expr {
-        ast::Expr::Column { .. } => {
-            resolve_typedef_from_column(expr, referenced_tables, resolver, program)
-                .filter(|td| td.is_struct())
-        }
+        ast::Expr::Column { .. } => resolve_typedef_from_column(expr, referenced_tables, resolver)
+            .filter(|td| td.is_struct()),
         ast::Expr::FunctionCall { name, args, .. } => {
             let normalized = crate::util::normalize_ident(name.as_str());
             match normalized.as_str() {
@@ -759,7 +753,7 @@ pub(super) fn resolve_struct_from_expr(
                 "union_extract" if args.len() == 2 => {
                     let tag_name = extract_string_literal(&args[1]).ok()?;
                     let union_td =
-                        resolve_union_from_column(&args[0], referenced_tables, resolver, program)?;
+                        resolve_union_from_column(&args[0], referenced_tables, resolver)?;
                     let (_, variant) = union_td.find_union_variant(&tag_name)?;
                     let struct_td = resolver
                         .schema()
@@ -774,7 +768,7 @@ pub(super) fn resolve_struct_from_expr(
                 "struct_extract" if args.len() == 2 => {
                     let field_name = extract_string_literal(&args[1]).ok()?;
                     let parent_td =
-                        resolve_struct_from_expr(&args[0], referenced_tables, resolver, program)?;
+                        resolve_struct_from_expr(&args[0], referenced_tables, resolver)?;
                     let (_, field_def) = parent_td.find_struct_field(&field_name)?;
                     let field_td = resolver
                         .schema()
@@ -792,13 +786,12 @@ pub(super) fn resolve_struct_from_expr(
     }
 }
 
-/// Get the type string for a column, handling both referenced_tables and self-table context.
+/// Get the type string for a column
 pub(super) fn resolve_column_type_str(
     table: ast::TableInternalId,
     column: usize,
     referenced_tables: Option<&TableReferences>,
     resolver: &Resolver,
-    _program: &ProgramBuilder,
 ) -> Option<String> {
     if let Some(rt) = referenced_tables {
         if let Some((_, tbl)) = rt.find_table_by_internal_id(table) {

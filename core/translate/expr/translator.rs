@@ -1898,12 +1898,8 @@ pub fn translate_expr(
                         ScalarFunc::UnionTagFunc => {
                             // union_tag(col): resolve col's union type for index→name lookup.
                             let args = expect_arguments_exact!(args, 1, srf);
-                            let td = resolve_union_from_column(
-                                &*args[0],
-                                referenced_tables,
-                                resolver,
-                                program,
-                            );
+                            let td =
+                                resolve_union_from_column(&*args[0], referenced_tables, resolver);
                             let tag_names = td
                                 .as_ref()
                                 .and_then(|td| td.union_def())
@@ -1917,12 +1913,8 @@ pub fn translate_expr(
                             let args = expect_arguments_exact!(args, 2, srf);
                             let tag_name = extract_string_literal(&*args[1])?;
                             // union_extract(col, 'tag'): resolve col's union type for name→index.
-                            let td = resolve_union_from_column(
-                                &*args[0],
-                                referenced_tables,
-                                resolver,
-                                program,
-                            );
+                            let td =
+                                resolve_union_from_column(&*args[0], referenced_tables, resolver);
                             let tag_index = td
                                 .as_ref()
                                 .and_then(|td| td.resolve_union_tag_index(&tag_name))
@@ -1938,12 +1930,8 @@ pub fn translate_expr(
                         ScalarFunc::StructExtractFunc => {
                             let args = expect_arguments_exact!(args, 2, srf);
                             let field_name = extract_string_literal(&*args[1])?;
-                            let td = resolve_struct_from_expr(
-                                &*args[0],
-                                referenced_tables,
-                                resolver,
-                                program,
-                            );
+                            let td =
+                                resolve_struct_from_expr(&*args[0], referenced_tables, resolver);
                             let (field_index, _) = td
                                 .as_ref()
                                 .and_then(|td| td.find_struct_field(&field_name))
@@ -2403,13 +2391,12 @@ pub fn translate_expr(
                             // if we're reading from an index that contains this virtual column,
                             // the index already has the computed value, so read it from the index
                             GeneratedType::Virtual { expr, .. } if !read_from_index => {
-                                let self_ctx = SelfTableContext::ForSelect {
-                                    table_ref_id: *table_ref_id,
-                                    referenced_tables: referenced_tables.unwrap().clone(),
-                                };
                                 resolver.with_self_table_context(
                                     program,
-                                    Some(&self_ctx),
+                                    Some(&SelfTableContext::ForSelect {
+                                        table_ref_id: *table_ref_id,
+                                        referenced_tables: referenced_tables.unwrap().clone(),
+                                    }),
                                     |program, _| {
                                         translate_expr(
                                             program,
