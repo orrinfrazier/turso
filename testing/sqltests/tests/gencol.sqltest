@@ -4563,3 +4563,29 @@ test update-covering-index-chained-virtual-gencol {
     1|bbb
     ok
 }
+
+@cross-check-integrity
+test update-partial-index-where-references-virtual-gencol {
+    CREATE TABLE t (a, c, e AS (a));
+    INSERT INTO t (a, c) VALUES (1, 'aaa'), (-1, 'xxx');
+    CREATE INDEX idx_t ON t (c) WHERE e > 0;
+    UPDATE t SET c = c || c;
+    SELECT a, c FROM t INDEXED BY idx_t WHERE e > 0;
+    PRAGMA integrity_check;
+} expect {
+    1|aaaaaa
+    ok
+}
+
+@cross-check-integrity
+test update-expression-index-references-virtual-gencol {
+    CREATE TABLE t (a, c, e AS (a));
+    INSERT INTO t (a, c) VALUES (1, 'aaa'), (2, 'xxx');
+    CREATE INDEX idx_t ON t (e+0, c);
+    UPDATE t SET c = c || c;
+    SELECT a, c FROM t INDEXED BY idx_t WHERE e+0 = 1;
+    PRAGMA integrity_check;
+} expect {
+    1|aaaaaa
+    ok
+}
