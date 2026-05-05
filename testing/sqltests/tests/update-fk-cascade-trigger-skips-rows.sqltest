@@ -215,3 +215,48 @@ expect {
     20|2
     30|3
 }
+
+@cross-check-integrity
+test update-fk-cascade-virtual-gencol-before-key {
+    PRAGMA foreign_keys=ON;
+    CREATE TABLE parent(
+        v INTEGER GENERATED ALWAYS AS (key * 10) VIRTUAL,
+        key INTEGER UNIQUE,
+        x INTEGER
+    );
+    CREATE TABLE child(id INTEGER PRIMARY KEY,
+                       pkey INTEGER REFERENCES parent(key) ON UPDATE CASCADE);
+    INSERT INTO parent(key, x) VALUES (1, 100), (2, 200);
+    INSERT INTO child VALUES (10, 1), (20, 2);
+    UPDATE parent SET key = 99 WHERE key = 1;
+    SELECT id, pkey FROM child ORDER BY id;
+}
+expect {
+    10|99
+    20|2
+}
+
+@cross-check-integrity
+test update-fk-cascade-virtual-gencol-before-key-multicol {
+    PRAGMA foreign_keys=ON;
+    CREATE TABLE parent(
+        v INTEGER GENERATED ALWAYS AS (a + b) VIRTUAL,
+        a INTEGER,
+        b INTEGER,
+        x INTEGER,
+        UNIQUE(a, b)
+    );
+    CREATE TABLE child(id INTEGER PRIMARY KEY,
+                       ca INTEGER,
+                       cb INTEGER,
+                       FOREIGN KEY(ca, cb) REFERENCES parent(a, b) ON UPDATE CASCADE);
+    INSERT INTO parent(a, b, x) VALUES (1, 1, 100), (2, 2, 200);
+    INSERT INTO child VALUES (10, 1, 1), (20, 2, 2);
+    UPDATE parent SET a = 99 WHERE a = 1;
+    SELECT id, ca, cb FROM child ORDER BY id;
+}
+expect {
+    10|99|1
+    20|2|2
+}
+
