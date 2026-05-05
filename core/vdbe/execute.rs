@@ -5,7 +5,9 @@ use crate::mvcc::cursor::{MvccCursorType, NextRowidResult};
 use crate::mvcc::database::CheckpointStateMachine;
 use crate::mvcc::MvccClock;
 use crate::numeric::Numeric;
-use crate::schema::{Schema, Table, SCHEMA_TABLE_NAME, SQLITE_SEQUENCE_TABLE_NAME};
+use crate::schema::{
+    render_gencol_expr_sql_with_new_names, Schema, Table, SCHEMA_TABLE_NAME, SQLITE_SEQUENCE_TABLE_NAME,
+};
 use crate::state_machine::StateMachine;
 use crate::storage::btree::{
     integrity_check, CursorTrait, IntegrityCheckError, IntegrityCheckState, PageCategory,
@@ -13011,6 +13013,17 @@ pub fn op_alter_column(
         }
         if *rename {
             btree.columns_mut()[*column_index].name = Some(new_name.clone());
+
+            // Refresh the cached sql in generated columns
+            let column_count = btree.columns().len();
+            for i in 0..column_count {
+                let cols_view = btree.columns();
+                cols_view[i]
+                    .generated_expr()
+                    .map(|expr| render_gencol_expr_sql_with_new_names(expr, cols_view))
+                    .transpose()?
+                    .map(|new_sql| btree.columns_mut()[i].set_generated_original_sql(new_sql));
+            }
         } else {
             btree.columns_mut()[*column_index] = new_column.clone();
         }

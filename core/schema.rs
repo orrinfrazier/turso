@@ -3461,6 +3461,28 @@ pub fn resolve_gencol_expr_columns(gencol_expr: &mut Expr, columns: &[Column]) -
     Ok(())
 }
 
+/// Re-render the SQL text of a generated-column expression using current column names. The input
+/// AST may have been previously resolved into `Expr::Column { table: SELF_TABLE, column: idx, .. }`
+/// nodes; we replace each such self-table reference with a fresh `Expr::Id(<col-name>)` before
+/// stringifying so the result round-trips through the parser, even if a referenced column was
+/// renamed since the original `original_sql` was captured.
+pub fn render_gencol_expr_sql_with_new_names(expr: &Expr, columns: &[Column]) -> Result<String> {
+    let mut clone = expr.clone();
+    walk_expr_mut(&mut clone, &mut |e| -> Result<WalkControl> {
+        if let Expr::Column { table, column, .. } = e {
+            if table.is_self_table() {
+                if let Some(col) = columns.get(*column) {
+                    if let Some(name) = col.name.as_ref() {
+                        *e = Expr::Id(Name::exact(name.clone()));
+                    }
+                }
+            }
+        }
+        Ok(WalkControl::Continue)
+    })?;
+    Ok(clone.to_string())
+}
+
 pub(crate) fn validate_generated_expr(expr: &Expr) -> Result<()> {
     use ast::Expr;
     match expr {
@@ -4581,6 +4603,17 @@ impl Column {
         match &mut self.generated_type {
             GeneratedType::Virtual { expr, .. } => Some(expr.as_mut()),
             GeneratedType::NotGenerated => None,
+        }
+    }
+
+    #[inline]
+    pub fn set_generated_original_sql(&mut self, new_sql: String) {
+        if let GeneratedType::Virtual {
+            ref mut original_sql,
+            ..
+        } = self.generated_type
+        {
+            *original_sql = new_sql;
         }
     }
 
