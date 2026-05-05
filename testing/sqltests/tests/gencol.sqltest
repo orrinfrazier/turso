@@ -3416,6 +3416,16 @@ expect pattern {
     ^CREATE TABLE t2 ?\(a, z AS \(a \+ 1\)\)$
 }
 
+test rename_then_drop_keeps_renamed_column {
+    CREATE TABLE t (a REAL AS (e), c INTEGER, d BLOB, f INTEGER AS (c * e), e REAL);
+    ALTER TABLE t RENAME COLUMN e TO ee;
+    ALTER TABLE t DROP COLUMN d;
+    SELECT sql FROM sqlite_master WHERE name = 't';
+}
+expect {
+    CREATE TABLE t (a REAL AS (ee), c INTEGER, f INTEGER AS (c * ee), ee REAL)
+}
+
 # =============================================================================
 # 15. INTEGER PRIMARY KEY Reference in Generated Columns
 # =============================================================================
