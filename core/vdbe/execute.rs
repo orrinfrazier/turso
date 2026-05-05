@@ -975,7 +975,10 @@ pub fn op_comparison(
         }
     }
 
-    let (new_lhs, new_rhs) = (affinity.convert(lhs_value), affinity.convert(rhs_value));
+    let (new_lhs, new_rhs) = (
+        affinity.convert_for_compare(lhs_value),
+        affinity.convert_for_compare(rhs_value),
+    );
 
     let should_jump = op.compare(
         new_lhs
