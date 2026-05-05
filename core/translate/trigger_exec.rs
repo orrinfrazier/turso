@@ -1038,6 +1038,8 @@ fn populate_trigger_register_affinities(resolver: &mut Resolver, ctx: &TriggerCo
     populate_trigger_row_register_affinities(resolver, &ctx.table, ctx.old_registers.as_deref());
 }
 
+// NEW/OLD columns don't have affinities, except for rowids and rowid aliases,
+// which have INTEGER affinity. See https://www.sqlite.org/forum/forumpost/819f2d6627
 fn populate_trigger_row_register_affinities(
     resolver: &mut Resolver,
     table: &BTreeTable,
@@ -1048,13 +1050,13 @@ fn populate_trigger_row_register_affinities(
     };
 
     for (idx, column) in table.columns().iter().enumerate() {
-        let affinity = if column.is_rowid_alias() {
-            Affinity::Integer
-        } else {
-            column.affinity_with_strict(table.is_strict)
-        };
+        if !column.is_rowid_alias() {
+            continue;
+        }
         if let Some(&register) = registers.get(idx) {
-            resolver.register_affinities.insert(register, affinity);
+            resolver
+                .register_affinities
+                .insert(register, Affinity::Integer);
         }
     }
 

@@ -1898,12 +1898,8 @@ pub fn translate_expr(
                         ScalarFunc::UnionTagFunc => {
                             // union_tag(col): resolve col's union type for index→name lookup.
                             let args = expect_arguments_exact!(args, 1, srf);
-                            let td = resolve_union_from_column(
-                                &*args[0],
-                                referenced_tables,
-                                resolver,
-                                program,
-                            );
+                            let td =
+                                resolve_union_from_column(&*args[0], referenced_tables, resolver);
                             let tag_names = td
                                 .as_ref()
                                 .and_then(|td| td.union_def())
@@ -1917,12 +1913,8 @@ pub fn translate_expr(
                             let args = expect_arguments_exact!(args, 2, srf);
                             let tag_name = extract_string_literal(&*args[1])?;
                             // union_extract(col, 'tag'): resolve col's union type for name→index.
-                            let td = resolve_union_from_column(
-                                &*args[0],
-                                referenced_tables,
-                                resolver,
-                                program,
-                            );
+                            let td =
+                                resolve_union_from_column(&*args[0], referenced_tables, resolver);
                             let tag_index = td
                                 .as_ref()
                                 .and_then(|td| td.resolve_union_tag_index(&tag_name))
@@ -1938,12 +1930,8 @@ pub fn translate_expr(
                         ScalarFunc::StructExtractFunc => {
                             let args = expect_arguments_exact!(args, 2, srf);
                             let field_name = extract_string_literal(&*args[1])?;
-                            let td = resolve_struct_from_expr(
-                                &*args[0],
-                                referenced_tables,
-                                resolver,
-                                program,
-                            );
+                            let td =
+                                resolve_struct_from_expr(&*args[0], referenced_tables, resolver);
                             let (field_index, _) = td
                                 .as_ref()
                                 .and_then(|td| td.find_struct_field(&field_name))
@@ -2191,7 +2179,7 @@ pub fn translate_expr(
         } if table_ref_id.is_self_table() => {
             // the table is a SELF_TABLE placeholder (used for generated columns), so we now have
             // to resolve it to the actual reference id using the SelfTableContext.
-            return program.with_existing_self_table_context(|program, self_table_context| {
+            return resolver.with_existing_self_table_context(|self_table_context| {
                 match self_table_context {
                     Some(SelfTableContext::ForSelect {
                         table_ref_id: real_id,
@@ -2221,7 +2209,7 @@ pub fn translate_expr(
                         Ok(target_register)
                     }
                     None => {
-                        // This error means that a program.with_self_table_context() was missing
+                        // This error means that a resolver.with_self_table_context() scope was missing
                         // somewhere in the call stack.
                         crate::bail_parse_error!(
                             "SELF_TABLE column reference outside of generated column context"
@@ -2403,7 +2391,8 @@ pub fn translate_expr(
                             // if we're reading from an index that contains this virtual column,
                             // the index already has the computed value, so read it from the index
                             GeneratedType::Virtual { expr, .. } if !read_from_index => {
-                                program.with_self_table_context(
+                                resolver.with_self_table_context(
+                                    program,
                                     Some(&SelfTableContext::ForSelect {
                                         table_ref_id: *table_ref_id,
                                         referenced_tables: referenced_tables.unwrap().clone(),
@@ -2970,10 +2959,9 @@ pub fn translate_expr(
                 }
                 ResolveType::Replace => {
                     crate::bail_parse_error!("REPLACE is not valid for RAISE");
-                }
-                // If the custom type requires parameters but the CAST
-                // doesn't provide them (e.g. CAST(x AS NUMERIC) vs
-                // CAST(x AS numeric(10,2))), fall through to regular CAST.
+                } // If the custom type requires parameters but the CAST
+                  // doesn't provide them (e.g. CAST(x AS NUMERIC) vs
+                  // CAST(x AS numeric(10,2))), fall through to regular CAST.
             }
             Ok(target_register)
         }

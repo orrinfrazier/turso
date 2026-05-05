@@ -71,7 +71,7 @@ pub(super) fn do_emit_table_column(
 ) -> Result<()> {
     match column.generated_type() {
         GeneratedType::Virtual { expr, .. } => {
-            program.with_self_table_context(Some(self_table_context), |program, _| {
+            resolver.with_self_table_context(program, Some(self_table_context), |program, _| {
                 translate_expr(program, referenced_tables, expr, target_register, resolver)?;
                 Ok(())
             })?;
